@@ -1,0 +1,46 @@
+services:
+  # 1. FastAPI Web Service (The API)
+  - type: web
+    name: green-scheduler-api
+    env: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: green-scheduler-redis
+          property: connectionString
+      - key: DATABASE_URL
+        sync: false # You will need to input your Supabase DB URL manually in the Render Dashboard
+      - key: WATTTIME_USERNAME
+        sync: false # Input manually in Render Dashboard
+      - key: WATTTIME_PASSWORD
+        sync: false # Input manually in Render Dashboard
+
+  # 2. Celery Background Worker (The Job Processor)
+  - type: worker
+    name: green-scheduler-celery-worker
+    env: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A celery_worker.celery_app worker --loglevel=info
+    envVars:
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: green-scheduler-redis
+          property: connectionString
+      - key: DATABASE_URL
+        sync: false
+      - key: WATTTIME_USERNAME
+        sync: false
+      - key: WATTTIME_PASSWORD
+        sync: false
+
+  # 3. Redis Instance (The Message Broker for Celery)
+  - type: redis
+    name: green-scheduler-redis
+    ipAllowList: [] # This ensures Redis is only accessible internally by your web and worker services
+    plan: free # You can change this to standard if you are upgrading from Render's free tier
